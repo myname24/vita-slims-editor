@@ -52,11 +52,11 @@ struct GameUnlockable {
 // ============================================================================
 
 namespace RAC1_VITA_DATA {
-    static const std::vector<GameValue> VALUES = {
+    inline const std::vector<GameValue> VALUES = {
         {"Bolts", "Current bolt count", 36, 0, 999999, 4},
     };
 
-    static const std::vector<GameWeapon> WEAPONS = {
+    inline const std::vector<GameWeapon> WEAPONS = {
         {"Bomb Glove", "Starting weapon", 324, 0, 40, 4},
         {"Pyrocitor", "Flamethrower", 348, 0, 240, 4},
         {"Blaster", "Rapid fire pistol", 344, 0, 200, 4},
@@ -70,7 +70,7 @@ namespace RAC1_VITA_DATA {
         {"Decoy Glove", "Spawns decoy", 384, 0, 20, 4},
     };
 
-    static const std::vector<GameGadget> GADGETS = {
+    inline const std::vector<GameGadget> GADGETS = {
         {"Heli-Pack", "Helicopter backpack", 442, 0},
         {"Thruster-Pack", "Jetpack", 443, 0},
         {"Hydro-Pack", "Underwater propulsion", 444, 0},
@@ -91,7 +91,7 @@ namespace RAC1_VITA_DATA {
         {"Persuader", "Unlock doors", 475, 0},
     };
 
-    static const std::vector<GameUnlockable> UNLOCKABLES = {
+    inline const std::vector<GameUnlockable> UNLOCKABLES = {
         {"Suck Cannon Owned", "Unlock Suck Cannon", 449, 0},
         {"Bomb Glove Owned", "Unlock Bomb Glove", 450, 0},
         {"Devastator Owned", "Unlock Devastator", 451, 0},
@@ -116,13 +116,13 @@ namespace RAC1_VITA_DATA {
 // ============================================================================
 
 namespace RAC2_VITA_DATA {
-    static const std::vector<GameValue> VALUES = {
+    inline const std::vector<GameValue> VALUES = {
         {"Bolts", "Current bolt count", 36, 0, 9999999, 4},
         {"Raritanium", "Upgrade currency", 40, 0, 99999, 4},
     };
 
     // 21 WEAPONS TOTAL - Corrected with verified Vita offsets + Ultra max ammo
-    static const std::vector<GameWeapon> WEAPONS = {
+    inline const std::vector<GameWeapon> WEAPONS = {
         // Clank weapon
         {"Clank Zapper", "Clank's weapon", 460, 0, 30, 4},  // VERIFIED
         
@@ -152,7 +152,7 @@ namespace RAC2_VITA_DATA {
         {"Shield Charger", "Protective shield", 604, 0, 8, 4}, // Tesla Barrier
     };
 
-    static const std::vector<GameGadget> GADGETS = {
+    inline const std::vector<GameGadget> GADGETS = {
         {"Heli-Pack", "Helicopter pack", 658, 0},
         {"Thruster-Pack", "Jetpack", 659, 0},
         {"Hydro-Pack", "Water propulsion", 660, 0},
@@ -174,7 +174,7 @@ namespace RAC2_VITA_DATA {
         {"Hypnomatic", "Mind control", 711, 0},
     };
 
-    static const std::vector<GameUnlockable> UNLOCKABLES = {
+    inline const std::vector<GameUnlockable> UNLOCKABLES = {
         {"Clank Zapper Owned", "Unlock Clank Zapper", 665, 0},
         {"Bomb Glove Owned", "Unlock Bomb Glove", 668, 0},
         {"Visibomb Gun Owned", "Unlock Visibomb Gun", 670, 0},
@@ -206,12 +206,13 @@ namespace RAC2_VITA_DATA {
 // ============================================================================
 
 namespace RAC3_VITA_DATA {
-    static const std::vector<GameValue> VALUES = {
+    inline const std::vector<GameValue> VALUES = {
         {"Bolts", "Current bolt count", 36, 0, 9999999, 4},
+        {"Max All Weapon EXP", "Set all weapons to max level", 0xFFFFFFFF, 0, 0, 0},
     };
 
     // 20 WEAPONS TOTAL - 14 native RC3 + 6 RC2 unlockables
-    static const std::vector<GameWeapon> WEAPONS = {
+    inline const std::vector<GameWeapon> WEAPONS = {
         // Native RC3 weapons (from uya.json)
         {"Shock Blaster", "Electric pistol", 716, 0, 60, 4},        // Omega Shock Cannon
         {"Nitro Launcher", "Rocket launcher", 1036, 0, 16, 4},      // Omega Nitro Eruptor
@@ -239,7 +240,7 @@ namespace RAC3_VITA_DATA {
     };
 
     // R&C3 weapon EXP system - 20 total (14 RC3 + 6 RC2)
-    static const std::vector<GameValue> WEAPON_EXP = {
+    inline const std::vector<GameValue> WEAPON_EXP = {
         // Native RC3 weapons
         {"Shock Blaster EXP", "Weapon experience", 1676, 0, 999999, 4},
         {"Nitro Launcher EXP", "Weapon experience", 1996, 0, 999999, 4},
@@ -266,7 +267,7 @@ namespace RAC3_VITA_DATA {
         {"RY3NO EXP", "Weapon experience", 2124, 0, 5700000, 4},
     };
 
-    static const std::vector<GameGadget> GADGETS = {
+    inline const std::vector<GameGadget> GADGETS = {
         {"Heli Pack", "Helicopter pack", 1194, 0},
         {"Thruster Pack", "Jetpack", 1195, 0},
         {"Hydro Pack", "Water propulsion", 1196, 0},
@@ -288,7 +289,7 @@ namespace RAC3_VITA_DATA {
         {"PDA", "Device", 1228, 0},
     };
 
-    static const std::vector<GameUnlockable> UNLOCKABLES = {
+    inline const std::vector<GameUnlockable> UNLOCKABLES = {
         {"Shock Blaster V1 Owned", "Unlock Shock Blaster", 1231, 0},
         {"N60 Storm V1 Owned", "Unlock N60 Storm", 1239, 0},
         {"Infector V1 Owned", "Unlock Infector", 1247, 0},

@@ -4,10 +4,6 @@
 #include <psp2/touch.h>
 #include <psp2/io/stat.h>
 
-// DEFINE the static members here (only once in the entire program)
-uint32_t InputState::oldButtons = 0;
-bool InputState::oldTouchPressed = false;
-
 App::App() 
     : window(nullptr), renderer(nullptr), font(nullptr),
       state(AppState::FILE_BROWSER), fileBrowser(nullptr), 
@@ -73,8 +69,8 @@ bool App::Initialize() {
     sceIoMkdir("ux0:/data/slimseditor/saves", 0777);
     
     // Initialize UI components
-    fileBrowser = new FileBrowser(renderer, font);
-    saveEditor = new SaveEditor(renderer, font);
+    fileBrowser = std::make_unique<FileBrowser>(renderer, font);
+    saveEditor = std::make_unique<SaveEditor>(renderer, font);
     
     return true;
 }
@@ -89,8 +85,9 @@ void App::Run() {
 }
 
 void App::Shutdown() {
-    if (saveEditor) delete saveEditor;
-    if (fileBrowser) delete fileBrowser;
+    // unique_ptr will clean up automatically; reset explicitly to be clear
+    if (saveEditor) saveEditor.reset();
+    if (fileBrowser) fileBrowser.reset();
     if (font) TTF_CloseFont(font);
     if (renderer) SDL_DestroyRenderer(renderer);
     if (window) SDL_DestroyWindow(window);

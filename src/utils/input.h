@@ -15,9 +15,8 @@ struct InputState {
     int touchX;
     int touchY;
     
-    // DECLARE static members (don't define them here!)
-    static uint32_t oldButtons;
-    static bool oldTouchPressed;
+    uint32_t oldButtons = 0;
+    bool oldTouchPressed = false;
     
     void Update() {
         sceCtrlPeekBufferPositive(0, &pad, 1);
@@ -46,6 +45,3 @@ struct InputState {
                touchY >= y && touchY < y + h;
     }
 };
-
-// NOTE: These are DECLARED here but DEFINED in a .cpp file
-// (we'll define them in app.cpp since it's included everywhere)

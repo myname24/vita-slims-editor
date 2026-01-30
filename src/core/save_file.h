@@ -11,6 +11,7 @@ public:
     
     bool Load(const std::string& path);
     bool Save();
+    bool Reload();
     bool IsLoaded() const { return loaded; }
     bool IsModified() const { return modified; }
     bool IsChecksumValid() const { return checksumValid; }

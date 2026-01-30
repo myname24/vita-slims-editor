@@ -6,6 +6,7 @@
 #include "ui/save_editor.h"
 #include "core/save_file.h"
 #include "utils/input.h"
+#include <memory>
 
 enum class AppState {
     FILE_BROWSER,
@@ -33,8 +34,8 @@ private:
     AppState state;
     InputState input;
     
-    FileBrowser* fileBrowser;
-    SaveEditor* saveEditor;
+    std::unique_ptr<FileBrowser> fileBrowser;
+    std::unique_ptr<SaveEditor> saveEditor;
     SaveFile saveFile;
     
     bool running;

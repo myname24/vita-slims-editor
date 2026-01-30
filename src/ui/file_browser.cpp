@@ -8,7 +8,7 @@
 
 FileBrowser::FileBrowser(SDL_Renderer* r, TTF_Font* f) 
     : renderer(r), font(f), selectedIndex(0), scrollOffset(0), needsRescan(true),
-      touchStartY(0), touchStartScroll(0), isDragging(false) {
+      scrollTimer(0), touchStartY(0), touchStartScroll(0), wasTouching(false) {
     currentPath = "ux0:/data/slimseditor/saves";
 }
 
@@ -95,8 +95,21 @@ void FileBrowser::Update(const InputState& input) {
     const int VISIBLE_ITEMS = 6;
     int maxScroll = (entries.size() > VISIBLE_ITEMS) ? (entries.size() - VISIBLE_ITEMS) : 0;
     
-    // D-PAD navigation with FIXED scrolling
-    if (input.IsPressed(SCE_CTRL_DOWN) && selectedIndex < (int)entries.size() - 1) {
+    // D-PAD navigation with continuous scrolling
+    bool moveDown = input.IsPressed(SCE_CTRL_DOWN);
+    bool moveUp = input.IsPressed(SCE_CTRL_UP);
+
+    if (input.IsHeld(SCE_CTRL_DOWN)) {
+        scrollTimer++;
+        if (scrollTimer > 15 && (scrollTimer % 3 == 0)) moveDown = true;
+    } else if (input.IsHeld(SCE_CTRL_UP)) {
+        scrollTimer++;
+        if (scrollTimer > 15 && (scrollTimer % 3 == 0)) moveUp = true;
+    } else {
+        scrollTimer = 0;
+    }
+
+    if (moveDown && selectedIndex < (int)entries.size() - 1) {
         selectedIndex++;
         
         // FIXED: Ensure last items are visible
@@ -105,7 +118,7 @@ void FileBrowser::Update(const InputState& input) {
         }
     }
     
-    if (input.IsPressed(SCE_CTRL_UP) && selectedIndex > 0) {
+    if (moveUp && selectedIndex > 0) {
         selectedIndex--;
         
         // FIXED: Proper scroll up
@@ -136,34 +149,41 @@ void FileBrowser::Update(const InputState& input) {
         SetPath(entries[0].fullPath);
     }
     
-    // TOUCH SCROLLING - Fixed implementation
-    if (input.touchPressed && input.touchY >= 140 && input.touchY < 500 && !isDragging) {
-        touchStartY = input.touchY;
-        touchStartScroll = scrollOffset;
-        isDragging = true;
-    }
-    
-    // While dragging
-    if (isDragging) {
-        // Check if still touching in the list area
-        if (input.touchY >= 140 && input.touchY < 500) {
-            int dragDistance = touchStartY - input.touchY;
-            int scrollDelta = dragDistance / 60;  // Each item is 60px
-            
-            scrollOffset = touchStartScroll + scrollDelta;
-            
-            // Clamp
-            if (scrollOffset < 0) scrollOffset = 0;
-            if (scrollOffset > maxScroll) scrollOffset = maxScroll;
+    // TOUCH SCROLLING
+    if (input.touchPressed && input.touchY >= 140 && input.touchY < 500) {
+        if (!wasTouching) {
+            touchStartY = input.touchY;
+            touchStartScroll = scrollOffset;
+            wasTouching = true;
         }
     }
     
+    if (wasTouching && input.touchY >= 140 && input.touchY < 500) {
+        int dragDistance = touchStartY - input.touchY;
+        int scrollDelta = dragDistance / 60;
+        
+        scrollOffset = touchStartScroll + scrollDelta;
+        
+        if (scrollOffset < 0) scrollOffset = 0;
+        if (scrollOffset > maxScroll) scrollOffset = maxScroll;
+        
+        // Keep selection visible while scrolling
+        if (selectedIndex < scrollOffset) {
+            selectedIndex = scrollOffset;
+        } else if (selectedIndex >= scrollOffset + VISIBLE_ITEMS) {
+            selectedIndex = scrollOffset + VISIBLE_ITEMS - 1;
+        }
+        
+        if (selectedIndex >= (int)entries.size()) selectedIndex = (int)entries.size() - 1;
+        if (selectedIndex < 0) selectedIndex = 0;
+    }
+    
     if (input.touchReleased) {
-        isDragging = false;
+        wasTouching = false;
     }
     
     // Touch selection (tap, not drag)
-    if (input.touchPressed && !isDragging && input.touchY >= 140 && input.touchY < 500) {
+    if (input.touchPressed && !wasTouching && input.touchY >= 140 && input.touchY < 500) {
         int y = 140;
         for (int i = scrollOffset; i < (int)entries.size() && i < scrollOffset + VISIBLE_ITEMS; i++) {
             if (input.touchY >= y && input.touchY < y + 60) {
@@ -183,6 +203,7 @@ void FileBrowser::Update(const InputState& input) {
 }
 
 void FileBrowser::Render() {
+    if (!renderer || !font) return;
     RenderHeader();
     RenderFileList();
     RenderFooter();
@@ -242,11 +263,11 @@ void FileBrowser::RenderFileList() {
     for (int i = scrollOffset; i < (int)entries.size() && visibleCount < VISIBLE_ITEMS; i++, visibleCount++) {
         bool selected = (i == selectedIndex);
         
-        // Background
-        SDL_Color bgColor = selected ? Colors::Selected() : Colors::Panel();
+        // Background (Vita style: Rounded look simulation via smaller rect inside)
+        SDL_Color bgColor = selected ? Colors::Selected() : Colors::PanelDark();
         SDL_SetRenderDrawColor(renderer, bgColor.r, bgColor.g, bgColor.b, bgColor.a);
-        SDL_Rect itemRect = {10, y - 5, 940, 55};
-        SDL_RenderFillRect(renderer, &itemRect);
+        SDL_Rect itemRect = {20, y, 920, 58}; // Indented with spacing
+        SDL_RenderFillRect(renderer, &itemRect); // SDL doesn't do rounded corners natively easily, but this spacing helps
         
         // Icon and name
         std::string displayName = entries[i].isDirectory ? "[DIR] " + entries[i].name : entries[i].name;
@@ -255,7 +276,7 @@ void FileBrowser::RenderFileList() {
         SDL_Surface* nameSurface = TTF_RenderUTF8_Blended(font, displayName.c_str(), textColor);
         if (nameSurface) {
             SDL_Texture* nameTexture = SDL_CreateTextureFromSurface(renderer, nameSurface);
-            SDL_Rect nameRect = {25, y + 5, nameSurface->w, nameSurface->h};
+            SDL_Rect nameRect = {40, y + (58 - nameSurface->h)/2, nameSurface->w, nameSurface->h}; // Vertically centered
             SDL_RenderCopy(renderer, nameTexture, nullptr, &nameRect);
             SDL_DestroyTexture(nameTexture);
             SDL_FreeSurface(nameSurface);
@@ -268,14 +289,14 @@ void FileBrowser::RenderFileList() {
             SDL_Surface* sizeSurface = TTF_RenderUTF8_Blended(font, sizeStr.c_str(), dimColor);
             if (sizeSurface) {
                 SDL_Texture* sizeTexture = SDL_CreateTextureFromSurface(renderer, sizeSurface);
-                SDL_Rect sizeRect = {920 - sizeSurface->w, y + 5, sizeSurface->w, sizeSurface->h};
+                SDL_Rect sizeRect = {920 - sizeSurface->w, y + (58 - sizeSurface->h)/2, sizeSurface->w, sizeSurface->h};
                 SDL_RenderCopy(renderer, sizeTexture, nullptr, &sizeRect);
                 SDL_DestroyTexture(sizeTexture);
                 SDL_FreeSurface(sizeSurface);
             }
         }
         
-        y += 60;
+        y += 64; // Increased spacing for "card" look
     }
     
     // Empty state

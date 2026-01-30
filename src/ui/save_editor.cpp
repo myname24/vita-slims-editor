@@ -10,7 +10,9 @@ SaveEditor::SaveEditor(SDL_Renderer* r, TTF_Font* f)
       currentGameType(GameType::UNKNOWN),
       currentGameData(), 
       currentTab(EditorTab::VALUES), selectedIndex(0), scrollOffset(0), 
-      wantsBack(false), isEditing(false), editingValue(0), editingMultiplier(1) {
+      wantsBack(false), scrollTimer(0), showConfirmation(false),
+      touchStartY(0), touchStartScroll(0), wasTouching(false),
+      isEditing(false), editingValue(0), editingMultiplier(1) {
 }
 
 SaveEditor::~SaveEditor() {
@@ -40,6 +42,18 @@ void SaveEditor::SetSaveFile(SaveFile* save) {
 void SaveEditor::Update(const InputState& input) {
     if (!saveFile) return;
     
+    // Confirmation Dialog Handling
+    if (showConfirmation) {
+        if (input.IsPressed(SCE_CTRL_CROSS)) {
+            ExecuteSelectAll();
+            showConfirmation = false;
+        }
+        if (input.IsPressed(SCE_CTRL_CIRCLE)) {
+            showConfirmation = false;
+        }
+        return;
+    }
+
     // If we're in editing mode, handle editing controls
     if (isEditing) {
         UpdateEditingMode(input);
@@ -48,6 +62,22 @@ void SaveEditor::Update(const InputState& input) {
     
     // Touch button detection
     if (input.touchPressed) {
+        // All/Max button (610, 20, 100, 40) - Only for Weapons/Gadgets/Unlocks
+        if (currentTab != EditorTab::VALUES && 
+            input.touchX >= 610 && input.touchX <= 710 &&
+            input.touchY >= 20 && input.touchY <= 60) {
+            HandleTrianglePress();
+            return;
+        }
+
+        // Reset button (500, 20, 100, 40)
+        if (input.touchX >= 500 && input.touchX <= 600 &&
+            input.touchY >= 20 && input.touchY <= 60) {
+            if (saveFile) saveFile->Reload();
+            isEditing = false;
+            return;
+        }
+
         // Save button (720, 20, 100, 40)
         if (input.touchX >= 720 && input.touchX <= 820 &&
             input.touchY >= 20 && input.touchY <= 60) {
@@ -104,8 +134,21 @@ void SaveEditor::Update(const InputState& input) {
     const int VISIBLE_ITEMS = 6;
     int maxScroll = (listSize > VISIBLE_ITEMS) ? (listSize - VISIBLE_ITEMS) : 0;
     
-    // Navigation
-    if (input.IsPressed(SCE_CTRL_DOWN)) {
+    // Navigation with Fast Scrolling
+    bool moveDown = input.IsPressed(SCE_CTRL_DOWN);
+    bool moveUp = input.IsPressed(SCE_CTRL_UP);
+    
+    if (input.IsHeld(SCE_CTRL_DOWN)) {
+        scrollTimer++;
+        if (scrollTimer > 15 && (scrollTimer % 3 == 0)) moveDown = true;
+    } else if (input.IsHeld(SCE_CTRL_UP)) {
+        scrollTimer++;
+        if (scrollTimer > 15 && (scrollTimer % 3 == 0)) moveUp = true;
+    } else {
+        scrollTimer = 0;
+    }
+    
+    if (moveDown) {
         selectedIndex++;
         if (selectedIndex >= listSize) selectedIndex = listSize - 1;
         
@@ -114,7 +157,7 @@ void SaveEditor::Update(const InputState& input) {
         }
     }
     
-    if (input.IsPressed(SCE_CTRL_UP)) {
+    if (moveUp) {
         selectedIndex--;
         if (selectedIndex < 0) selectedIndex = 0;
         
@@ -129,6 +172,11 @@ void SaveEditor::Update(const InputState& input) {
     // Edit/Toggle with X
     if (input.IsPressed(SCE_CTRL_CROSS)) {
         HandleCrossPress();
+    }
+    
+    // Toggle All with TRIANGLE
+    if (input.IsPressed(SCE_CTRL_TRIANGLE)) {
+        HandleTrianglePress();
     }
     
     // Save with START
@@ -170,10 +218,6 @@ void SaveEditor::Update(const InputState& input) {
     }
     
     // TOUCH SCROLLING
-    static int touchStartY = 0;
-    static int touchStartScroll = 0;
-    static bool wasTouching = false;
-    
     if (input.touchPressed && input.touchY >= 140 && input.touchY < 500) {
         if (!wasTouching) {
             touchStartY = input.touchY;
@@ -270,7 +314,7 @@ void SaveEditor::HandleCrossPress() {
 
 void SaveEditor::EditValue() {
     int totalValues = currentGameData.values.size() + currentGameData.extra_values.size();
-    if (selectedIndex >= totalValues || !saveFile) return;
+    if (selectedIndex >= totalValues || !saveFile || !saveFile->IsLoaded()) return;
     
     const GameValue* value = nullptr;
     if (selectedIndex < (int)currentGameData.values.size()) {
@@ -279,6 +323,17 @@ void SaveEditor::EditValue() {
         value = &currentGameData.extra_values[selectedIndex - currentGameData.values.size()];
     }
     
+    // Handle Max All Weapon EXP (RC3)
+    if (value->offset == 0xFFFFFFFF) {
+        for (const auto& exp : currentGameData.extra_values) {
+             saveFile->WriteInt32(exp.offset, exp.max_value);
+        }
+        return;
+    }
+    
+    // Validate offset against file size
+    if (static_cast<size_t>(value->offset) + value->byte_size > saveFile->GetSize()) return;
+
     int current = saveFile->ReadInt32(value->offset);
     
     isEditing = true;
@@ -290,9 +345,11 @@ void SaveEditor::EditValue() {
 }
 
 void SaveEditor::EditWeaponAmmo() {
-    if (selectedIndex >= (int)currentGameData.weapons.size() || !saveFile) return;
+    if (selectedIndex >= (int)currentGameData.weapons.size() || !saveFile || !saveFile->IsLoaded()) return;
     
     const GameWeapon& weapon = currentGameData.weapons[selectedIndex];
+    if (static_cast<size_t>(weapon.ammo_offset) + weapon.byte_size > saveFile->GetSize()) return;
+
     int current = saveFile->ReadInt32(weapon.ammo_offset);
     
     isEditing = true;
@@ -325,6 +382,58 @@ void SaveEditor::ToggleUnlockable() {
     saveFile->WriteBool(unlockable.offset, !current, unlockable.bit_index);
 }
 
+void SaveEditor::HandleTrianglePress() {
+    if (!saveFile) return;
+    if (currentTab != EditorTab::VALUES) {
+        showConfirmation = true;
+    }
+}
+
+void SaveEditor::ExecuteSelectAll() {
+    if (!saveFile) return;
+    
+    if (currentTab == EditorTab::WEAPONS) {
+        // Check if all are maxed
+        bool allMaxed = true;
+        for (const auto& weapon : currentGameData.weapons) {
+            int current = saveFile->ReadInt32(weapon.ammo_offset);
+            if (current < weapon.max_ammo) {
+                allMaxed = false;
+                break;
+            }
+        }
+        
+        // Toggle: If all maxed -> Empty all. Else -> Max all.
+        for (const auto& weapon : currentGameData.weapons) {
+            saveFile->WriteInt32(weapon.ammo_offset, allMaxed ? weapon.min_ammo : weapon.max_ammo);
+        }
+    } else if (currentTab == EditorTab::GADGETS) {
+        bool allOwned = true;
+        for (const auto& gadget : currentGameData.gadgets) {
+            if (!saveFile->ReadBool(gadget.offset, gadget.bit_index)) {
+                allOwned = false;
+                break;
+            }
+        }
+        
+        for (const auto& gadget : currentGameData.gadgets) {
+            saveFile->WriteBool(gadget.offset, !allOwned, gadget.bit_index);
+        }
+    } else if (currentTab == EditorTab::UNLOCKABLES) {
+        bool allOwned = true;
+        for (const auto& unlock : currentGameData.unlockables) {
+            if (!saveFile->ReadBool(unlock.offset, unlock.bit_index)) {
+                allOwned = false;
+                break;
+            }
+        }
+        
+        for (const auto& unlock : currentGameData.unlockables) {
+            saveFile->WriteBool(unlock.offset, !allOwned, unlock.bit_index);
+        }
+    }
+}
+
 void SaveEditor::Render() {
     if (isEditing) {
         RenderHeader();
@@ -336,7 +445,28 @@ void SaveEditor::Render() {
         RenderHeader();
         RenderTabs();
         RenderTabContent();
+        
+        // Calculate total items for scrollbar
+        int listSize = 0;
+        switch (currentTab) {
+            case EditorTab::VALUES:
+                listSize = currentGameData.values.size() + currentGameData.extra_values.size();
+                break;
+            case EditorTab::WEAPONS:
+                listSize = currentGameData.weapons.size();
+                break;
+            case EditorTab::GADGETS:
+                listSize = currentGameData.gadgets.size();
+                break;
+            case EditorTab::UNLOCKABLES:
+                listSize = currentGameData.unlockables.size();
+                break;
+        }
+        RenderScrollbar(listSize);
         RenderFooter();
+    }
+    if (showConfirmation) {
+        RenderConfirmationDialog();
     }
 }
 
@@ -399,13 +529,64 @@ void SaveEditor::RenderHeader() {
         }
     }
     
+    // ALL/MAX button (Only if not VALUES tab)
+    if (currentTab != EditorTab::VALUES) {
+        SDL_Rect allBtn = {610, 20, 100, 40};
+        SDL_Color allBg = Colors::Selected();
+        SDL_SetRenderDrawColor(renderer, allBg.r, allBg.g, allBg.b, allBg.a);
+        SDL_RenderFillRect(renderer, &allBtn);
+        
+        SDL_Color btnBorder = Colors::Border();
+        SDL_SetRenderDrawColor(renderer, btnBorder.r, btnBorder.g, btnBorder.b, btnBorder.a);
+        SDL_RenderDrawRect(renderer, &allBtn);
+        
+        const char* btnText = (currentTab == EditorTab::WEAPONS) ? "MAX" : "ALL";
+        
+        SDL_Surface* allSurface = TTF_RenderUTF8_Blended(font, btnText, Colors::Text());
+        if (allSurface) {
+            SDL_Texture* allTexture = SDL_CreateTextureFromSurface(renderer, allSurface);
+            SDL_Rect allTextRect = {
+                allBtn.x + (allBtn.w - allSurface->w) / 2,
+                allBtn.y + (allBtn.h - allSurface->h) / 2,
+                allSurface->w,
+                allSurface->h
+            };
+            SDL_RenderCopy(renderer, allTexture, nullptr, &allTextRect);
+            SDL_DestroyTexture(allTexture);
+            SDL_FreeSurface(allSurface);
+        }
+    }
+    
+    // RESET button
+    SDL_Rect resetBtn = {500, 20, 100, 40};
+    SDL_Color resetBg = Colors::PanelDark();
+    SDL_SetRenderDrawColor(renderer, resetBg.r, resetBg.g, resetBg.b, resetBg.a);
+    SDL_RenderFillRect(renderer, &resetBtn);
+    
+    SDL_Color btnBorder = Colors::Border();
+    SDL_SetRenderDrawColor(renderer, btnBorder.r, btnBorder.g, btnBorder.b, btnBorder.a);
+    SDL_RenderDrawRect(renderer, &resetBtn);
+    
+    SDL_Surface* resetSurface = TTF_RenderUTF8_Blended(font, "RESET", Colors::Text());
+    if (resetSurface) {
+        SDL_Texture* resetTexture = SDL_CreateTextureFromSurface(renderer, resetSurface);
+        SDL_Rect resetTextRect = {
+            resetBtn.x + (resetBtn.w - resetSurface->w) / 2,
+            resetBtn.y + (resetBtn.h - resetSurface->h) / 2,
+            resetSurface->w,
+            resetSurface->h
+        };
+        SDL_RenderCopy(renderer, resetTexture, nullptr, &resetTextRect);
+        SDL_DestroyTexture(resetTexture);
+        SDL_FreeSurface(resetSurface);
+    }
+    
     // SAVE button
     SDL_Rect saveBtn = {720, 20, 100, 40};
     SDL_Color saveBg = Colors::Success();
     SDL_SetRenderDrawColor(renderer, saveBg.r, saveBg.g, saveBg.b, saveBg.a);
     SDL_RenderFillRect(renderer, &saveBtn);
     
-    SDL_Color btnBorder = Colors::Border();
     SDL_SetRenderDrawColor(renderer, btnBorder.r, btnBorder.g, btnBorder.b, btnBorder.a);
     SDL_RenderDrawRect(renderer, &saveBtn);
     
@@ -486,6 +667,35 @@ void SaveEditor::RenderTabs() {
             SDL_FreeSurface(textSurface);
         }
     }
+}
+
+void SaveEditor::RenderScrollbar(int totalItems) {
+    const int VISIBLE_ITEMS = 6;
+    if (totalItems <= VISIBLE_ITEMS) return;
+    
+    int trackH = 6 * 60; // 360px height
+    int trackY = 140;    // Start Y
+    int trackX = 954;    // Right edge
+    
+    // Draw track
+    SDL_Rect track = {trackX, trackY, 4, trackH};
+    SDL_Color trackColor = Colors::PanelDark();
+    SDL_SetRenderDrawColor(renderer, trackColor.r, trackColor.g, trackColor.b, trackColor.a);
+    SDL_RenderFillRect(renderer, &track);
+    
+    // Draw thumb
+    float viewRatio = (float)VISIBLE_ITEMS / totalItems;
+    int thumbH = (int)(trackH * viewRatio);
+    if (thumbH < 30) thumbH = 30; // Minimum thumb height
+    
+    int maxScroll = totalItems - VISIBLE_ITEMS;
+    float scrollRatio = (float)scrollOffset / maxScroll;
+    int thumbY = trackY + (int)((trackH - thumbH) * scrollRatio);
+    
+    SDL_Rect thumb = {trackX, thumbY, 4, thumbH};
+    SDL_Color thumbColor = Colors::Accent();
+    SDL_SetRenderDrawColor(renderer, thumbColor.r, thumbColor.g, thumbColor.b, thumbColor.a);
+    SDL_RenderFillRect(renderer, &thumb);
 }
 
 void SaveEditor::RenderTabContent() {
@@ -831,13 +1041,61 @@ void SaveEditor::RenderEditingOverlay() {
     }
 }
 
+void SaveEditor::RenderConfirmationDialog() {
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200);
+    SDL_Rect overlay = {0, 0, 960, 544};
+    SDL_RenderFillRect(renderer, &overlay);
+    
+    SDL_Color panelColor = Colors::Panel();
+    SDL_SetRenderDrawColor(renderer, panelColor.r, panelColor.g, panelColor.b, 255);
+    SDL_Rect panel = {280, 172, 400, 200};
+    SDL_RenderFillRect(renderer, &panel);
+    
+    SDL_Color borderColor = Colors::Accent();
+    SDL_SetRenderDrawColor(renderer, borderColor.r, borderColor.g, borderColor.b, 255);
+    SDL_RenderDrawRect(renderer, &panel);
+    
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    
+    const char* title = (currentTab == EditorTab::WEAPONS) ? "MAX ALL WEAPONS?" : "SELECT ALL ITEMS?";
+    SDL_Surface* titleSurf = TTF_RenderUTF8_Blended(font, title, Colors::Accent());
+    if (titleSurf) {
+        SDL_Texture* titleTex = SDL_CreateTextureFromSurface(renderer, titleSurf);
+        SDL_Rect titleRect = {480 - titleSurf->w/2, 200, titleSurf->w, titleSurf->h};
+        SDL_RenderCopy(renderer, titleTex, nullptr, &titleRect);
+        SDL_DestroyTexture(titleTex);
+        SDL_FreeSurface(titleSurf);
+    }
+    
+    const char* msg = "This will modify all items in this tab.";
+    SDL_Surface* msgSurf = TTF_RenderUTF8_Blended(font, msg, Colors::TextDim());
+    if (msgSurf) {
+        SDL_Texture* msgTex = SDL_CreateTextureFromSurface(renderer, msgSurf);
+        SDL_Rect msgRect = {480 - msgSurf->w/2, 250, msgSurf->w, msgSurf->h};
+        SDL_RenderCopy(renderer, msgTex, nullptr, &msgRect);
+        SDL_DestroyTexture(msgTex);
+        SDL_FreeSurface(msgSurf);
+    }
+    
+    const char* controls = "X: Confirm | O: Cancel";
+    SDL_Surface* ctrlSurf = TTF_RenderUTF8_Blended(font, controls, Colors::Text());
+    if (ctrlSurf) {
+        SDL_Texture* ctrlTex = SDL_CreateTextureFromSurface(renderer, ctrlSurf);
+        SDL_Rect ctrlRect = {480 - ctrlSurf->w/2, 300, ctrlSurf->w, ctrlSurf->h};
+        SDL_RenderCopy(renderer, ctrlTex, nullptr, &ctrlRect);
+        SDL_DestroyTexture(ctrlTex);
+        SDL_FreeSurface(ctrlSurf);
+    }
+}
+
 void SaveEditor::RenderFooter() {
     SDL_Color panelColor = Colors::PanelDark();
     SDL_SetRenderDrawColor(renderer, panelColor.r, panelColor.g, panelColor.b, panelColor.a);
     SDL_Rect footerRect = {0, 500, 960, 44};
     SDL_RenderFillRect(renderer, &footerRect);
     
-    const char* controls = "X: Edit/Toggle | O: Back | START: Save | L/R: Switch Tabs";
+    const char* controls = "X: Edit | TRI: All | O: Back | START: Save | L/R: Tabs";
     
     SDL_Color dimColor = Colors::TextDim();
     SDL_Surface* controlsSurface = TTF_RenderUTF8_Blended(font, controls, dimColor);

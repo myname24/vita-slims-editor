@@ -40,9 +40,10 @@ private:
     int selectedIndex;
     int scrollOffset;
     bool needsRescan;
+    int scrollTimer;
     
     // Touch scrolling
     int touchStartY;
     int touchStartScroll;
-    bool isDragging;
+    bool wasTouching;
 };

@@ -36,9 +36,13 @@ private:
     void SaveEditedValue();
     void ToggleGadget();
     void ToggleUnlockable();
+    void HandleTrianglePress();
+    void ExecuteSelectAll();
+    void RenderConfirmationDialog();
     
     void RenderHeader();
     void RenderTabs();
+    void RenderScrollbar(int totalItems);
     void RenderTabContent();
     void RenderValuesTab();
     void RenderWeaponsTab();
@@ -60,6 +64,13 @@ private:
     int selectedIndex;
     int scrollOffset;
     bool wantsBack;
+    int scrollTimer;
+    bool showConfirmation;
+    
+    // Touch scrolling state
+    int touchStartY;
+    int touchStartScroll;
+    bool wasTouching;
     
     // D-pad editor state
     bool isEditing;

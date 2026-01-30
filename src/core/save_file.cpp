@@ -2,6 +2,7 @@
 #include "save_file.h"
 #include <fstream>
 #include <cstring>
+#include <cstdio>
 
 SaveFile::SaveFile() 
     : loaded(false), modified(false), checksumValid(true), 
@@ -46,27 +47,41 @@ bool SaveFile::Save() {
         RecalculateChecksum();
     }
     
-    std::ofstream file(filePath, std::ios::binary);
+    // ATOMIC SAVE: Write to temp file first to prevent corruption
+    std::string tempPath = filePath + ".tmp";
+    std::ofstream file(tempPath, std::ios::binary);
     if (!file.is_open()) return false;
     
     if (!file.write(reinterpret_cast<const char*>(data.data()), data.size())) {
+        file.close();
+        std::remove(tempPath.c_str()); // Clean up temp if write failed
         return false;
     }
+    file.close();
+    
+    // Replace original with temp
+    std::remove(filePath.c_str());
+    std::rename(tempPath.c_str(), filePath.c_str());
     
     modified = false;
     return true;
 }
 
+bool SaveFile::Reload() {
+    if (filePath.empty()) return false;
+    return Load(filePath);
+}
+
 uint8_t SaveFile::ReadByte(uint32_t offset) const {
-    if (offset >= data.size()) return 0;
-    return data[offset];
+    if (static_cast<size_t>(offset) >= data.size()) return 0;
+    return data[static_cast<size_t>(offset)];
 }
 
 int32_t SaveFile::ReadInt32(uint32_t offset) const {
-    if (offset + 3 >= data.size()) return 0;
-    
+    if (static_cast<size_t>(offset) + sizeof(int32_t) > data.size()) return 0;
+
     int32_t value;
-    std::memcpy(&value, &data[offset], sizeof(int32_t));
+    std::memcpy(&value, &data[static_cast<size_t>(offset)], sizeof(int32_t));
     return value;
 }
 
@@ -78,29 +93,30 @@ bool SaveFile::ReadBool(uint32_t offset, uint8_t bitIndex) const {
 }
 
 void SaveFile::WriteByte(uint32_t offset, uint8_t value) {
-    if (offset >= data.size()) return;
-    
-    data[offset] = value;
+    if (static_cast<size_t>(offset) >= data.size()) return;
+
+    data[static_cast<size_t>(offset)] = value;
     modified = true;
 }
 
 void SaveFile::WriteInt32(uint32_t offset, int32_t value) {
-    if (offset + 3 >= data.size()) return;
-    
-    std::memcpy(&data[offset], &value, sizeof(int32_t));
+    if (static_cast<size_t>(offset) + sizeof(int32_t) > data.size()) return;
+
+    std::memcpy(&data[static_cast<size_t>(offset)], &value, sizeof(int32_t));
     modified = true;
 }
 
 void SaveFile::WriteBool(uint32_t offset, bool value, uint8_t bitIndex) {
-    if (offset >= data.size() || bitIndex > 7) return;
-    
-    uint8_t byte = data[offset];
+    if (bitIndex > 7) return;
+    if (static_cast<size_t>(offset) >= data.size()) return;
+
+    uint8_t byte = data[static_cast<size_t>(offset)];
     if (value) {
         byte |= (1 << bitIndex);
     } else {
         byte &= ~(1 << bitIndex);
     }
-    data[offset] = byte;
+    data[static_cast<size_t>(offset)] = byte;
     modified = true;
 }
 
