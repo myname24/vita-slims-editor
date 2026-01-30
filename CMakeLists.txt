@@ -16,7 +16,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall")
 # App Information
 set(VITA_APP_NAME "Vita Slim's Editor")
 set(VITA_TITLEID  "SLMS00001")
-set(VITA_VERSION  "01.00")
+set(VITA_VERSION  "01.01")
 
 # Source files
 set(SOURCES
