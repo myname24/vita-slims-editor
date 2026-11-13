@@ -86,7 +86,9 @@ uint8_t SaveFile::ReadByte(uint32_t offset) const {
 }
 
 int32_t SaveFile::ReadInt32(uint32_t offset) const {
-    if (static_cast<size_t>(offset) + sizeof(int32_t) > data.size()) return 0;
+    // Written as a subtraction so a huge offset (e.g. the 0xFFFFFFFF "action row"
+    // marker) cannot wrap around on the Vita's 32-bit size_t and pass the check.
+    if (data.size() < sizeof(int32_t) || static_cast<size_t>(offset) > data.size() - sizeof(int32_t)) return 0;
 
     int32_t value;
     std::memcpy(&value, &data[static_cast<size_t>(offset)], sizeof(int32_t));
@@ -108,7 +110,7 @@ void SaveFile::WriteByte(uint32_t offset, uint8_t value) {
 }
 
 void SaveFile::WriteInt32(uint32_t offset, int32_t value) {
-    if (static_cast<size_t>(offset) + sizeof(int32_t) > data.size()) return;
+    if (data.size() < sizeof(int32_t) || static_cast<size_t>(offset) > data.size() - sizeof(int32_t)) return;
 
     std::memcpy(&data[static_cast<size_t>(offset)], &value, sizeof(int32_t));
     modified = true;

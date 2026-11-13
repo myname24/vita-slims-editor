@@ -360,7 +360,8 @@ void SaveEditor::EditValue() {
     }
     
     // Validate offset against file size
-    if (static_cast<size_t>(value->offset) + value->byte_size > saveFile->GetSize()) return;
+    if (saveFile->GetSize() < value->byte_size ||
+        static_cast<size_t>(value->offset) > saveFile->GetSize() - value->byte_size) return;
 
     int current = saveFile->ReadInt32(value->offset);
     
@@ -376,7 +377,8 @@ void SaveEditor::EditWeaponAmmo() {
     if (selectedIndex >= (int)currentGameData.weapons.size() || !saveFile || !saveFile->IsLoaded()) return;
     
     const GameWeapon& weapon = currentGameData.weapons[selectedIndex];
-    if (static_cast<size_t>(weapon.ammo_offset) + weapon.byte_size > saveFile->GetSize()) return;
+    if (saveFile->GetSize() < weapon.byte_size ||
+        static_cast<size_t>(weapon.ammo_offset) > saveFile->GetSize() - weapon.byte_size) return;
 
     int current = saveFile->ReadInt32(weapon.ammo_offset);
     
@@ -796,9 +798,13 @@ void SaveEditor::RenderValuesTab() {
             SDL_FreeSurface(nameSurface);
         }
         
-        int currentValue = saveFile->ReadInt32(value->offset);
         char valueBuf[64];
-        snprintf(valueBuf, sizeof(valueBuf), "%d", currentValue);
+        if (value->offset == 0xFFFFFFFF) {
+            // Action row ("Max All Weapon EXP"), not a stored value.
+            snprintf(valueBuf, sizeof(valueBuf), "MAX ALL");
+        } else {
+            snprintf(valueBuf, sizeof(valueBuf), "%d", saveFile->ReadInt32(value->offset));
+        }
         
         SDL_Color valueColor = Colors::AccentHover();
         SDL_Surface* valueSurface = TTF_RenderUTF8_Blended(font, valueBuf, valueColor);
