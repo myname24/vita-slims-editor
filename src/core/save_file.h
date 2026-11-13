@@ -3,20 +3,28 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include "save_store.h"
 
 class SaveFile {
 public:
     SaveFile();
     ~SaveFile();
-    
-    bool Load(const std::string& path);
+
+    // Reads the save decrypted through SaveStore. On failure the previously
+    // loaded save (if any) is left untouched and GetLastError() says why.
+    bool Load(const SaveSlot& slot);
+    // Writes the save back in place. The first Save after a Load first backs
+    // up the bytes as originally loaded; a failed backup aborts the save.
     bool Save();
     bool Reload();
     bool IsLoaded() const { return loaded; }
     bool IsModified() const { return modified; }
     bool IsChecksumValid() const { return checksumValid; }
-    
-    std::string GetPath() const { return filePath; }
+
+    // Set on any failed Load/Save/Reload, cleared on success.
+    const std::string& GetLastError() const { return lastError; }
+    const SaveSlot& GetSlot() const { return slot; }
+    std::string GetPath() const { return slot.filePath; }
     size_t GetSize() const { return data.size(); }
     
     // Read operations
@@ -36,7 +44,10 @@ public:
     
 private:
     std::vector<uint8_t> data;
-    std::string filePath;
+    std::vector<uint8_t> originalData;  // bytes as loaded, for the backup
+    SaveSlot slot;
+    std::string lastError;
+    bool backupDone;                    // backup written since the last Load
     bool loaded;
     bool modified;
     bool checksumValid;

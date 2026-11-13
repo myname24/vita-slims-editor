@@ -2,14 +2,14 @@
 #pragma once
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
-#include "ui/file_browser.h"
+#include "ui/save_browser.h"
 #include "ui/save_editor.h"
 #include "core/save_file.h"
 #include "utils/input.h"
 #include <memory>
 
 enum class AppState {
-    FILE_BROWSER,
+    SAVE_BROWSER,
     SAVE_EDITOR
 };
 
@@ -34,7 +34,7 @@ private:
     AppState state;
     InputState input;
     
-    std::unique_ptr<FileBrowser> fileBrowser;
+    std::unique_ptr<SaveBrowser> saveBrowser;
     std::unique_ptr<SaveEditor> saveEditor;
     SaveFile saveFile;
     

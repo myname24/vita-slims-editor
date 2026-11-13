@@ -2,7 +2,7 @@
 
 A clean, modern save editor for the **Ratchet & Clank HD Collection** on PS Vita.
 
-![Version](https://img.shields.io/badge/version-1.0-blue)
+![Version](https://img.shields.io/badge/version-2.0-blue)
 ![Platform](https://img.shields.io/badge/platform-PS%20Vita-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -16,6 +16,8 @@ A clean, modern save editor for the **Ratchet & Clank HD Collection** on PS Vita
 
 ## 🎮 Features
 
+- **Edits saves in place (new in 2.0)**: opens the game's save data directly and handles decrypting and re-encrypting itself — no Apollo, no file copying
+- **Automatic backup**: the original save is kept in `ux0:data/slimseditor/backups` before the first write
 - **Multi-game support**: Ratchet & Clank 1, 2, and 3 HD
 - **Auto-detection**: Automatically detects which game you're editing
 - **Touch controls**: Full touchscreen support for intuitive editing
@@ -70,18 +72,16 @@ make
 
 ## 🎮 Usage
 
-### Getting Your Save Files
+### Requirements
 
-**Option 1: Apollo Save Tool**
-1. Use Apollo to decrypt your saves
-2. Export decrypted save files
-3. Copy to editing location
+- HENkaku / Ensō with **Unsafe Homebrew** enabled (HENkaku Settings)
+- Close the game before editing its save
 
 ### Editing
 
 1. Launch **Vita Slim's Editor**
-2. Browse to your save file
-3. Select save file to load
+2. The save list shows the Ratchet & Clank saves found in `ux0:user/00/savedata`
+3. Press **X** on a save to open it (it is decrypted automatically)
 4. Use tabs to navigate:
    - **Values**: Bolts, Raritanium, etc.
    - **Weapons**: Weapon ammo
@@ -100,7 +100,13 @@ make
 - **O**: Cancel/Back
 - **START**: Quick save
 - **Touch SAVE button**: Save changes
-- **Touch BACK button**: Return to file browser
+- **Touch BACK button**: Return to the save list
+
+**Save list:**
+- **X**: Open save
+- **Square**: Rescan
+- **Triangle**: Switch between Ratchet & Clank saves and all save folders
+- **START**: Exit
 
 **Value Editor (D-pad mode):**
 - **Up/Down**: Increase/decrease by step
@@ -113,11 +119,11 @@ make
 
 **Step sizes:** 1, 10, 100, 1K, 10K, 100K, 1M
 
-### Restoring Edited Saves
+### Saving and Backups
 
-1. Copy edited `SAVEDATA.BIN` back to Apollo save folder
-2. Import the save file using Apollo
-3. Launch game and verify changes
+Saving writes straight back into the game's save data; the system re-encrypts it.
+Before the first write, the original (decrypted) save is copied to
+`ux0:data/slimseditor/backups/<TITLEID>/`. Launch the game to verify changes.
 
 ## ⚙️ Technical Details
 
@@ -130,10 +136,15 @@ The editor uses file size to automatically detect which game:
 
 ### Save File Format
 
-All saves are decrypted `.BIN` files with:
+Once decrypted, the saves use:
 - Little-endian 32-bit integers for values
 - Bitflags for gadgets/unlockables
-- No encryption (when using decrypted saves)
+
+### Save Access
+
+The save folder is PFS-encrypted. The editor loads VitaShell's kernel and user
+modules and mounts the folder (the same method Apollo Save Tool uses), so files
+are read and written in plain form. See [docs/SPEC-2.0.md](docs/SPEC-2.0.md).
 
 ### Offset Verification
 
@@ -204,6 +215,8 @@ Contributions are welcome! Please:
 ## 🙏 Credits
 
 - **Offset data**: [RatchetModding/slimseditor](https://github.com/RatchetModding/slimseditor)
+- **Save mounting modules** (`libs/kernel.skprx`, `libs/user.suprx`): [VitaShell](https://github.com/TheOfficialFloW/VitaShell) by TheFloW, GPLv3, shipped unmodified
+- **Mounting approach**: [Apollo Save Tool](https://github.com/bucanero/apollo-vita) by Bucanero
 - **VitaSDK**: The VitaSDK team
 - **SDL2**: Sam Lantinga and contributors
 - **Community**: PS Vita homebrew community

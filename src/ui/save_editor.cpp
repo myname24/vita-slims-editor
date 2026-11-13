@@ -6,7 +6,8 @@
 #include <cstdio>
 
 SaveEditor::SaveEditor(SDL_Renderer* r, TTF_Font* f) 
-    : renderer(r), font(f), saveFile(nullptr), 
+    : statusColor(Colors::Text()), statusTimer(0),
+      renderer(r), font(f), saveFile(nullptr),
       currentGameType(GameType::UNKNOWN),
       currentGameData(), 
       currentTab(EditorTab::VALUES), selectedIndex(0), scrollOffset(0), 
@@ -16,6 +17,32 @@ SaveEditor::SaveEditor(SDL_Renderer* r, TTF_Font* f)
 }
 
 SaveEditor::~SaveEditor() {
+}
+
+void SaveEditor::SetStatus(const std::string& text, SDL_Color color) {
+    statusText = text;
+    statusColor = color;
+    statusTimer = 180; // ~3 seconds
+}
+
+void SaveEditor::DoSave() {
+    if (!saveFile) return;
+    if (saveFile->Save()) {
+        SetStatus("Saved. Backup kept in ux0:data/slimseditor/backups", Colors::Success());
+    } else {
+        std::string err = saveFile->GetLastError();
+        SetStatus(err.empty() ? "Save failed" : err, Colors::Error());
+    }
+}
+
+void SaveEditor::DoReload() {
+    if (!saveFile) return;
+    if (saveFile->Reload()) {
+        SetStatus("Reloaded from save data", Colors::Success());
+    } else {
+        std::string err = saveFile->GetLastError();
+        SetStatus(err.empty() ? "Reload failed" : err, Colors::Error());
+    }
 }
 
 void SaveEditor::SetSaveFile(SaveFile* save) {
@@ -37,11 +64,14 @@ void SaveEditor::SetSaveFile(SaveFile* save) {
         currentTab = EditorTab::VALUES;
         isEditing = false;
     }
+    statusTimer = 0;
 }
 
 void SaveEditor::Update(const InputState& input) {
     if (!saveFile) return;
-    
+
+    if (statusTimer > 0) statusTimer--;
+
     // Confirmation Dialog Handling
     if (showConfirmation) {
         if (input.IsPressed(SCE_CTRL_CROSS)) {
@@ -73,7 +103,7 @@ void SaveEditor::Update(const InputState& input) {
         // Reset button (500, 20, 100, 40)
         if (input.touchX >= 500 && input.touchX <= 600 &&
             input.touchY >= 20 && input.touchY <= 60) {
-            if (saveFile) saveFile->Reload();
+            DoReload();
             isEditing = false;
             return;
         }
@@ -81,9 +111,7 @@ void SaveEditor::Update(const InputState& input) {
         // Save button (720, 20, 100, 40)
         if (input.touchX >= 720 && input.touchX <= 820 &&
             input.touchY >= 20 && input.touchY <= 60) {
-            if (saveFile->Save()) {
-                // Successfully saved
-            }
+            DoSave();
             return;
         }
         
@@ -181,7 +209,7 @@ void SaveEditor::Update(const InputState& input) {
     
     // Save with START
     if (input.IsPressed(SCE_CTRL_START)) {
-        saveFile->Save();
+        DoSave();
     }
     
     // Back with CIRCLE
@@ -497,7 +525,17 @@ void SaveEditor::RenderHeader() {
         gameName = "UNKNOWN GAME";
     }
     
-    SDL_Surface* titleSurface = TTF_RenderUTF8_Blended(font, gameName, Colors::Text());
+    // Append the title id when it fits left of the header buttons (x = 500)
+    std::string titleText = gameName;
+    if (saveFile && !saveFile->GetSlot().titleId.empty()) {
+        std::string withId = titleText + " - " + saveFile->GetSlot().titleId;
+        int tw = 0, th = 0;
+        if (TTF_SizeUTF8(font, withId.c_str(), &tw, &th) == 0 && 75 + tw <= 490) {
+            titleText = withId;
+        }
+    }
+
+    SDL_Surface* titleSurface = TTF_RenderUTF8_Blended(font, titleText.c_str(), Colors::Text());
     if (titleSurface) {
         SDL_Texture* titleTexture = SDL_CreateTextureFromSurface(renderer, titleSurface);
         SDL_Rect titleRect = {75, 15, titleSurface->w, titleSurface->h};
@@ -1096,8 +1134,13 @@ void SaveEditor::RenderFooter() {
     SDL_RenderFillRect(renderer, &footerRect);
     
     const char* controls = "X: Edit | TRI: All | O: Back | START: Save | L/R: Tabs";
-    
+
+    // A transient status message temporarily takes the place of the controls hint
     SDL_Color dimColor = Colors::TextDim();
+    if (statusTimer > 0 && !statusText.empty()) {
+        controls = statusText.c_str();
+        dimColor = statusColor;
+    }
     SDL_Surface* controlsSurface = TTF_RenderUTF8_Blended(font, controls, dimColor);
     if (controlsSurface) {
         SDL_Texture* controlsTexture = SDL_CreateTextureFromSurface(renderer, controlsSurface);

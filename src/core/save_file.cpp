@@ -1,33 +1,33 @@
 // save_file.cpp - With checksum validation
 #include "save_file.h"
-#include <fstream>
 #include <cstring>
-#include <cstdio>
 
-SaveFile::SaveFile() 
-    : loaded(false), modified(false), checksumValid(true), 
+SaveFile::SaveFile()
+    : backupDone(false), loaded(false), modified(false), checksumValid(true),
       storedChecksum(0), checksumOffset(0) {
 }
 
 SaveFile::~SaveFile() {
 }
 
-bool SaveFile::Load(const std::string& path) {
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file.is_open()) return false;
-    
-    std::streamsize size = file.tellg();
-    file.seekg(0, std::ios::beg);
-    
-    data.resize(size);
-    if (!file.read(reinterpret_cast<char*>(data.data()), size)) {
+bool SaveFile::Load(const SaveSlot& newSlot) {
+    std::vector<uint8_t> bytes;
+    std::string err;
+    if (!SaveStore::ReadFile(newSlot, bytes, err)) {
+        lastError = err.empty() ? "Could not read the save file." : err;
         return false;
     }
-    
-    filePath = path;
+
+    // newSlot may alias this->slot (Reload), so copy before assigning.
+    SaveSlot slotCopy = newSlot;
+    slot = slotCopy;
+    originalData = bytes;
+    data.swap(bytes);
+    backupDone = false;
     loaded = true;
     modified = false;
-    
+    lastError.clear();
+
     // Try to detect and validate checksum
     if (DetectChecksumLocation()) {
         checksumValid = ValidateChecksum();
@@ -40,36 +40,44 @@ bool SaveFile::Load(const std::string& path) {
 }
 
 bool SaveFile::Save() {
-    if (!loaded) return false;
-    
+    if (!loaded) {
+        lastError = "No save is loaded.";
+        return false;
+    }
+
     // Recalculate checksum before saving if one exists
     if (checksumOffset > 0 && checksumOffset < data.size() - 4) {
         RecalculateChecksum();
     }
-    
-    // ATOMIC SAVE: Write to temp file first to prevent corruption
-    std::string tempPath = filePath + ".tmp";
-    std::ofstream file(tempPath, std::ios::binary);
-    if (!file.is_open()) return false;
-    
-    if (!file.write(reinterpret_cast<const char*>(data.data()), data.size())) {
-        file.close();
-        std::remove(tempPath.c_str()); // Clean up temp if write failed
+
+    std::string err;
+
+    // Back up the bytes as originally loaded, once per Load.
+    if (!backupDone) {
+        if (!SaveStore::WriteBackup(slot, originalData, err)) {
+            lastError = err.empty() ? "Could not write the backup." : err;
+            return false;
+        }
+        backupDone = true;
+    }
+
+    // Overwrite in place inside the mounted save folder.
+    if (!SaveStore::WriteFile(slot, data, err)) {
+        lastError = err.empty() ? "Could not write the save file." : err;
         return false;
     }
-    file.close();
-    
-    // Replace original with temp
-    std::remove(filePath.c_str());
-    std::rename(tempPath.c_str(), filePath.c_str());
-    
+
     modified = false;
+    lastError.clear();
     return true;
 }
 
 bool SaveFile::Reload() {
-    if (filePath.empty()) return false;
-    return Load(filePath);
+    if (slot.filePath.empty()) {
+        lastError = "No save is loaded.";
+        return false;
+    }
+    return Load(slot);
 }
 
 uint8_t SaveFile::ReadByte(uint32_t offset) const {

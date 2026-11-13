@@ -358,9 +358,7 @@ struct GameData {
     }
 };
 
-inline GameType DetectGameType(const std::vector<uint8_t>& saveData) {
-    size_t fileSize = saveData.size();
-    
+inline GameType DetectGameTypeBySize(size_t fileSize) {
     if (fileSize > 0) {
         if (fileSize >= 650000 && fileSize <= 850000) {
             return GameType::RAC1_VITA;
@@ -374,6 +372,10 @@ inline GameType DetectGameType(const std::vector<uint8_t>& saveData) {
     }
     
     return GameType::UNKNOWN;
+}
+
+inline GameType DetectGameType(const std::vector<uint8_t>& saveData) {
+    return DetectGameTypeBySize(saveData.size());
 }
 
 inline std::string GetGameName(GameType type) {

@@ -5,6 +5,7 @@
 #include "../core/save_file.h"
 #include "../data/rac_vita_games_data.h"
 #include "../utils/input.h"
+#include <string>
 
 enum class EditorTab {
     VALUES,
@@ -52,6 +53,14 @@ private:
     void RenderFooter();
     
     void DrawCheckbox(int x, int y, bool checked, bool hovered);
+
+    // Transient status message (shown in the footer)
+    void SetStatus(const std::string& text, SDL_Color color);
+    void DoSave();
+    void DoReload();
+    std::string statusText;
+    SDL_Color statusColor;
+    int statusTimer;
     
     SDL_Renderer* renderer;
     TTF_Font* font;

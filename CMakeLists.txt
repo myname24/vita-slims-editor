@@ -16,15 +16,20 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall")
 # App Information
 set(VITA_APP_NAME "Vita Slim's Editor")
 set(VITA_TITLEID  "SLMS00001")
-set(VITA_VERSION  "01.01")
+set(VITA_VERSION  "02.00")
+
+# VitaShell modules (headers, user stub library, kernel.skprx / user.suprx)
+include_directories(libs)
+link_directories(libs)
 
 # Source files
 set(SOURCES
     src/main.cpp
     src/app.cpp
     src/core/save_file.cpp
+    src/core/save_store.cpp
     src/core/game_data.cpp
-    src/ui/file_browser.cpp
+    src/ui/save_browser.cpp
     src/ui/save_editor.cpp
     src/ui/keyboard.cpp
 )
@@ -33,8 +38,9 @@ set(SOURCES
 set(HEADERS
     src/app.h
     src/core/save_file.h
+    src/core/save_store.h
     src/data/rac_vita_games_data.h
-    src/ui/file_browser.h
+    src/ui/save_browser.h
     src/ui/save_editor.h
     src/ui/keyboard.h
     src/utils/colors.h
@@ -62,13 +68,22 @@ target_link_libraries(${PROJECT_NAME}
     SceHid_stub
     ScePgf_stub
     SceIme_stub
+    VitaShellUser_stub_weak
+    taihen_stub
+    SceVshBridge_stub
+    SceAppMgr_stub
+    SceIofilemgr_stub
+    SceKernelModulemgr_stub
     m
 )
 
-vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME})
+# UNSAFE: required to load the kernel module and mount other titles' saves
+vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME} UNSAFE)
 # VPK Creation with icon
 vita_create_vpk(${PROJECT_NAME}.vpk ${VITA_TITLEID} ${PROJECT_NAME}.self
     VERSION ${VITA_VERSION}
     NAME ${VITA_APP_NAME}
     FILE sce_sys/icon0.png sce_sys/icon0.png
+    FILE libs/user.suprx sce_module/user.suprx
+    FILE libs/kernel.skprx sce_module/kernel.skprx
 )
