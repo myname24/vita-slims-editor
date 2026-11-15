@@ -45,8 +45,8 @@ bool SaveFile::Save() {
         return false;
     }
 
-    // Recalculate checksum before saving if one exists
-    if (checksumOffset > 0 && checksumOffset < data.size() - 4) {
+    // Recalculate the section checksum if this save uses one (RC3)
+    if (checksumOffset > 0) {
         RecalculateChecksum();
     }
 
@@ -130,40 +130,49 @@ void SaveFile::WriteBool(uint32_t offset, bool value, uint8_t bitIndex) {
     modified = true;
 }
 
+// Save layout (all three games): two u32 sizes, then the first section as
+//   u32 size @8, u32 checksum @12, `size` bytes of data @16.
+// RC3 stores a CRC16 of that data in the checksum field and ignores a save
+// whose checksum is wrong; RC1 and RC2 leave the field at 0. The checksum is
+// only treated as present when the stored value matches the calculation, so
+// a file that does not use it is never altered.
+static const uint32_t kSectionSizeOffset = 8;
+static const uint32_t kSectionChecksumOffset = 12;
+static const uint32_t kSectionDataOffset = 16;
+
 bool SaveFile::DetectChecksumLocation() {
-    // R&C save files typically store checksum in last 4 bytes
-    if (data.size() < 8) return false;
-    
-    // Common checksum locations:
-    // 1. Last 4 bytes of file
-    checksumOffset = data.size() - 4;
-    storedChecksum = ReadInt32(checksumOffset);
-    
+    checksumOffset = 0;
+    storedChecksum = 0;
+    if (data.size() < kSectionDataOffset) return false;
+
+    uint32_t stored = static_cast<uint32_t>(ReadInt32(kSectionChecksumOffset));
+    if (stored == 0) return false;
+
+    checksumOffset = kSectionChecksumOffset;
+    if (CalculateChecksum() != stored) {
+        checksumOffset = 0;
+        return false;
+    }
+    storedChecksum = stored;
     return true;
 }
 
 uint32_t SaveFile::CalculateChecksum() const {
-    // Simple CRC32-like checksum
-    // Calculate over all data except the checksum itself
-    uint32_t checksum = 0xFFFFFFFF;
-    
-    for (size_t i = 0; i < data.size(); i++) {
-        // Skip checksum location
-        if (i >= checksumOffset && i < checksumOffset + 4) {
-            continue;
-        }
-        
-        checksum ^= data[i];
+    // CRC16 used by the Ratchet & Clank save format: polynomial 0x1F45,
+    // initial value 0x8320, over the first section's data.
+    if (data.size() < kSectionDataOffset) return 0;
+    size_t size = static_cast<uint32_t>(ReadInt32(kSectionSizeOffset));
+    if (size == 0 || size > data.size() - kSectionDataOffset) return 0;
+
+    uint32_t crc = 0x8320;
+    for (size_t i = 0; i < size; i++) {
+        crc ^= static_cast<uint32_t>(data[kSectionDataOffset + i]) << 8;
         for (int j = 0; j < 8; j++) {
-            if (checksum & 1) {
-                checksum = (checksum >> 1) ^ 0xEDB88320;
-            } else {
-                checksum >>= 1;
-            }
+            crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1F45) : (crc << 1);
+            crc &= 0xFFFF;
         }
     }
-    
-    return ~checksum;
+    return crc;
 }
 
 bool SaveFile::ValidateChecksum() {
