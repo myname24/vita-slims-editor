@@ -2,7 +2,7 @@
 
 A clean, modern save editor for the **Ratchet & Clank HD Collection** on PS Vita.
 
-![Version](https://img.shields.io/badge/version-2.0-blue)
+![Version](https://img.shields.io/badge/version-2.0.1-blue)
 ![Platform](https://img.shields.io/badge/platform-PS%20Vita-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
