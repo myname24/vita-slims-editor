@@ -102,7 +102,13 @@ bool SaveFile::ReadBool(uint32_t offset, uint8_t bitIndex) const {
     return (byte >> bitIndex) & 1;
 }
 
+// The first 16 bytes are the file header (section sizes and checksum). No
+// editable item lives there, and overwriting them makes the game reject the
+// save, so edits to that range are refused.
+static const uint32_t kHeaderSize = 16;
+
 void SaveFile::WriteByte(uint32_t offset, uint8_t value) {
+    if (offset < kHeaderSize) return;
     if (static_cast<size_t>(offset) >= data.size()) return;
 
     data[static_cast<size_t>(offset)] = value;
@@ -110,6 +116,7 @@ void SaveFile::WriteByte(uint32_t offset, uint8_t value) {
 }
 
 void SaveFile::WriteInt32(uint32_t offset, int32_t value) {
+    if (offset < kHeaderSize) return;
     if (data.size() < sizeof(int32_t) || static_cast<size_t>(offset) > data.size() - sizeof(int32_t)) return;
 
     std::memcpy(&data[static_cast<size_t>(offset)], &value, sizeof(int32_t));
@@ -117,7 +124,7 @@ void SaveFile::WriteInt32(uint32_t offset, int32_t value) {
 }
 
 void SaveFile::WriteBool(uint32_t offset, bool value, uint8_t bitIndex) {
-    if (bitIndex > 7) return;
+    if (bitIndex > 7 || offset < kHeaderSize) return;
     if (static_cast<size_t>(offset) >= data.size()) return;
 
     uint8_t byte = data[static_cast<size_t>(offset)];
@@ -186,7 +193,9 @@ void SaveFile::RecalculateChecksum() {
     if (checksumOffset == 0) return;  // No checksum
     
     uint32_t newChecksum = CalculateChecksum();
-    WriteInt32(checksumOffset, newChecksum);
+    // Written directly: WriteInt32 refuses the header range.
+    if (data.size() < kSectionDataOffset) return;
+    std::memcpy(&data[checksumOffset], &newChecksum, sizeof(newChecksum));
     storedChecksum = newChecksum;
     checksumValid = true;
 }

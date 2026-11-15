@@ -219,7 +219,7 @@ namespace RAC3_VITA_DATA {
         {"N60 Storm", "Machine gun", 748, 0, 400, 4},               // Omega N90 Hurricane
         {"Plasma Whip", "Melee weapon", 1068, 0, 60, 4},            // Omega Quantum Whip
         {"Infector", "Infection weapon", 780, 0, 30, 4},            // Omega Infecto-Bomb
-        {"Suck Cannon", "Vortex weapon", 0, 0, 30, 4},              // Omega Vortex Cannon (NO AMMO - offset unknown)
+        {"Suck Cannon", "Vortex weapon", 1100, 0, 16, 4},           // Omega Vortex Cannon (weapon id 135: ammo = 560 + 4*id)
         {"Spitting Hydra", "Multi-rocket", 844, 0, 30, 4},          // Omega Tempest
         {"Agents of Doom", "Spawns agents", 908, 0, 12, 4},         // Omega Agents of Dread
         {"Flux Rifle", "Sniper rifle", 1004, 0, 20, 4},             // Omega Splitter Rifle
@@ -248,14 +248,14 @@ namespace RAC3_VITA_DATA {
         {"Plasma Whip EXP", "Weapon experience", 2028, 0, 999999, 4},
         {"Infector EXP", "Weapon experience", 1740, 0, 999999, 4},
         {"Qwack-O-Ray EXP", "Weapon experience", 2092, 0, 999999, 4},          
-        {"Spitting Hydra EXP", "Weapon experience", 2060, 0, 999999, 4},
+        {"Suck Cannon EXP", "Weapon experience", 2060, 0, 999999, 4},          // id 135: exp = 1520 + 4*id
         {"Agents of Doom EXP", "Weapon experience", 1868, 0, 999999, 4},
         {"Flux Rifle EXP", "Weapon experience", 1964, 0, 999999, 4},
         {"Annihilator EXP", "Weapon experience", 1772, 0, 999999, 4},
         {"Holoshield EXP", "Weapon experience", 1932, 0, 999999, 4},
         {"Disc Blade Gun EXP", "Weapon experience", 1836, 0, 999999, 4},
         {"Rift Inducer EXP", "Weapon experience", 1900, 0, 999999, 4},
-        {"Suck Cannon EXP", "Weapon experience", 1804, 0, 999999, 4},
+        {"Spitting Hydra EXP", "Weapon experience", 1804, 0, 999999, 4},       // id 71
         
         // RC2 weapons - VERIFIED OFFSETS ✅
         {"Miniturret EXP", "RC2 weapon", 1604, 0, 999999, 4},               
