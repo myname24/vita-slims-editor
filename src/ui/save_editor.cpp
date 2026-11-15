@@ -377,6 +377,10 @@ void SaveEditor::EditWeaponAmmo() {
     if (selectedIndex >= (int)currentGameData.weapons.size() || !saveFile || !saveFile->IsLoaded()) return;
     
     const GameWeapon& weapon = currentGameData.weapons[selectedIndex];
+    if (!weapon.IsEditable()) {
+        SetStatus(weapon.name + " ammo cannot be edited", Colors::Warning());
+        return;
+    }
     if (saveFile->GetSize() < weapon.byte_size ||
         static_cast<size_t>(weapon.ammo_offset) > saveFile->GetSize() - weapon.byte_size) return;
 
@@ -426,6 +430,7 @@ void SaveEditor::ExecuteSelectAll() {
         // Check if all are maxed
         bool allMaxed = true;
         for (const auto& weapon : currentGameData.weapons) {
+            if (!weapon.IsEditable()) continue;
             int current = saveFile->ReadInt32(weapon.ammo_offset);
             if (current < weapon.max_ammo) {
                 allMaxed = false;
@@ -435,6 +440,7 @@ void SaveEditor::ExecuteSelectAll() {
         
         // Toggle: If all maxed -> Empty all. Else -> Max all.
         for (const auto& weapon : currentGameData.weapons) {
+            if (!weapon.IsEditable()) continue;
             saveFile->WriteInt32(weapon.ammo_offset, allMaxed ? weapon.min_ammo : weapon.max_ammo);
         }
     } else if (currentTab == EditorTab::GADGETS) {
@@ -869,9 +875,13 @@ void SaveEditor::RenderWeaponsTab() {
         int ammo = saveFile->ReadInt32(weapon.ammo_offset);
         
         char ammoBuf[64];
-        snprintf(ammoBuf, sizeof(ammoBuf), "%d / %d", ammo, weapon.max_ammo);
-        
-        SDL_Color valueColor = Colors::AccentHover();
+        if (weapon.IsEditable()) {
+            snprintf(ammoBuf, sizeof(ammoBuf), "%d / %d", ammo, weapon.max_ammo);
+        } else {
+            snprintf(ammoBuf, sizeof(ammoBuf), "%d (locked)", ammo);
+        }
+
+        SDL_Color valueColor = weapon.IsEditable() ? Colors::AccentHover() : Colors::TextDim();
         SDL_Surface* ammoSurface = TTF_RenderUTF8_Blended(font, ammoBuf, valueColor);
         if (ammoSurface) {
             SDL_Texture* ammoTexture = SDL_CreateTextureFromSurface(renderer, ammoSurface);

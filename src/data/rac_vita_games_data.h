@@ -29,8 +29,10 @@ struct GameWeapon {
     std::string description;
     uint32_t ammo_offset;
     int32_t min_ammo;
-    int32_t max_ammo;
+    int32_t max_ammo;      // 0 = ammo is shown but cannot be edited
     uint32_t byte_size;
+
+    bool IsEditable() const { return max_ammo > 0; }
 };
 
 struct GameGadget {
@@ -219,7 +221,7 @@ namespace RAC3_VITA_DATA {
         {"N60 Storm", "Machine gun", 748, 0, 400, 4},               // Omega N90 Hurricane
         {"Plasma Whip", "Melee weapon", 1068, 0, 60, 4},            // Omega Quantum Whip
         {"Infector", "Infection weapon", 780, 0, 30, 4},            // Omega Infecto-Bomb
-        {"Suck Cannon", "Vortex weapon", 1100, 0, 16, 4},           // Omega Vortex Cannon (weapon id 135: ammo = 560 + 4*id)
+        {"Suck Cannon", "Vortex weapon", 1100, 0, 0, 4},            // Omega Vortex Cannon (id 135). max 0 = read-only: its ammo is the enemies it holds
         {"Spitting Hydra", "Multi-rocket", 844, 0, 30, 4},          // Omega Tempest
         {"Agents of Doom", "Spawns agents", 908, 0, 12, 4},         // Omega Agents of Dread
         {"Flux Rifle", "Sniper rifle", 1004, 0, 20, 4},             // Omega Splitter Rifle
